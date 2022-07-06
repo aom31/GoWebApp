@@ -1,36 +1,78 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
+	"log"
 	"net/http"
+	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/gin-gonic/gin"
 )
 
-type album struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Artist string `json:"artist"`
-	Price  string `json:"price"`
+type Attraction struct {
+	Id         string ` db:"id"  json:"id"`
+	Name       string `db:"name" json:"name"`
+	Detail     string `db:"detail"	json:"detail"`
+	Coverimage string `db:"coverimage"	json:"coverimage"`
+	Latitude   string `db:"latitude"	json:"latitude"`
+	Longtitude string `db:"longtitude" 	json:"longtitude"`
 }
 
-//create album data array
-var albums = []album{
-	{ID: "1", Title: "BNK", Artist: "bnk48", Price: "2100"},
-	{ID: "2", Title: "Boy", Artist: "pakorn", Price: "1200"},
-	{ID: "3", Title: "bank", Artist: "cash", Price: "1400"},
-	{ID: "4", Title: "singto", Artist: "numto", Price: "2500"},
-}
+var db *sql.DB
 
 func main() {
-	fmt.Println("hello go")
+	var err error
+	//connect db
+	db, err = sql.Open("mysql", "root:@tcp(localhost:3306)/gosqlapi")
+	if err != nil {
+		panic(err)
+	}
+	// See "Important settings" section.
+	db.SetConnMaxLifetime(time.Minute * 3)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
+
 	router := gin.Default()
-	router.GET("/albums", getAlbum)
+	router.GET("/attractions", getAttraction)
 
 	router.Run("localhost:8080")
 }
 
 //when call api response json
-func getAlbum(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, albums)
+func getAttraction(c *gin.Context) {
+	// var (
+	// 	id         int
+	// 	name       string
+	// 	detail     string
+	// 	coverimage string
+	// 	latitude   float64
+	// 	longtitude float64
+	// )
+
+	//from struct
+	var attractions []Attraction
+	//query data
+	rows, err := db.Query("select * from attractions ")
+	//check
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close() //call wheen func finish
+	for rows.Next() {
+		var a Attraction //recive data each rows
+		// err := rows.Scan(&id, &name, &detail, &coverimage, &latitude, &longtitude)
+		err := rows.Scan(a.Id, a.Name, a.Detail, a.Coverimage, a.Latitude, a.Longtitude)
+		if err != nil {
+			log.Fatal(err)
+		}
+		attractions = append(attractions, a)
+
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+	c.IndentedJSON(http.StatusOK, attractions)
 }
